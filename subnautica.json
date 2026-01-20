@@ -1,28 +1,26 @@
 {
-    "_comment": "Nitrox Subnautica Server Egg for Pelican Panel",
     "meta": {
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2026-01-19T00:00:00+00:00",
     "name": "Nitrox Subnautica",
-    "author": "custom@pelican.panel",
-    "description": "Nitrox is a multiplayer mod for the game Subnautica. This egg will automatically download and install the latest Nitrox server on Linux.",
+    "author": "admin@example.com",
+    "description": "Nitrox multiplayer mod server for Subnautica",
     "features": null,
     "docker_images": {
         "ghcr.io/parkervcp/yolks:dotnet_9": "ghcr.io/parkervcp/yolks:dotnet_9"
     },
     "file_denylist": [],
-    "startup": "dotnet ./Nitrox.Server.Subnautica.dll",
+    "startup": "dotnet Nitrox.Server.Subnautica.dll",
     "config": {
         "files": "{}",
-        "startup": "{\n    \"done\": \"Server is now running\"\n}",
+        "startup": "{\n    \"done\": \"listening\"\n}",
         "logs": "{}",
-        "stop": "^C"
+        "stop": "stop"
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\nset -euo pipefail\n\n# Move to installation directory\ncd /mnt/server\n\n# Config\ndotnet_required_min_version=\"9.0\"\nnitrox_launcher_file_name=\"Nitrox.Launcher\"\nnitrox_server_file_name=\"Nitrox.Server.Subnautica\"\n\nget_nitrox_latest_download_url() {\n    nitrox_target_arch=$(uname -m)\n    if [ \"$nitrox_target_arch\" == \"x86_64\" ]; then\n        nitrox_target_arch=\"x64\"\n    elif [ \"$nitrox_target_arch\" == \"aarch64\" ]; then\n        nitrox_target_arch=\"arm64\"\n    fi\n    curl -s https://api.github.com/repos/SubnauticaNitrox/Nitrox/releases/latest \\\n        | awk -v arch=\"linux_$nitrox_target_arch\" -F'\"' '\n        /browser_download_url/ && $0 ~ arch {\n            print $4\n            exit\n        }\n    '\n}\n\necho \"Downloading latest Nitrox Linux release...\"\nnitrox_download_url=$(get_nitrox_latest_download_url)\necho \"Download URL: $nitrox_download_url\"\n\ncurl -L -o nitrox.zip \"$nitrox_download_url\"\n\necho \"Extracting all contents...\"\nunzip -o nitrox.zip -d /mnt/server\n\n# Ensure execute permissions\nchmod +x \"${nitrox_launcher_file_name}\" 2>/dev/null || true\nchmod +x \"${nitrox_server_file_name}\" 2>/dev/null || true\n\n# Clean up\nrm -f nitrox.zip\n\necho \"Installation complete!\"\necho \"Server files are ready at: /mnt/server\"\necho \"Startup command: dotnet ./Nitrox.Server.Subnautica.dll\"",
+            "script": "#!/bin/bash\ncd /mnt/server\napt update\napt install -y curl unzip jq\nARCH=$(uname -m)\nif [ \"$ARCH\" = \"x86_64\" ]; then\n    ARCH=\"x64\"\nelif [ \"$ARCH\" = \"aarch64\" ]; then\n    ARCH=\"arm64\"\nfi\nURL=$(curl -s https://api.github.com/repos/SubnauticaNitrox/Nitrox/releases/latest | jq -r \".assets[] | select(.name | contains(\\\"linux_${ARCH}\\\")) | .browser_download_url\")\necho \"Downloading from: $URL\"\ncurl -L -o nitrox.zip \"$URL\"\nunzip -o nitrox.zip\nrm nitrox.zip\nchmod +x Nitrox.Server.Subnautica 2>/dev/null || true\nchmod +x Nitrox.Launcher 2>/dev/null || true\necho \"Installation complete\"",
             "container": "ghcr.io/parkervcp/installers:debian",
             "entrypoint": "bash"
         }
@@ -30,52 +28,12 @@
     "variables": [
         {
             "name": "Server Port",
-            "description": "The port for the Nitrox server to listen on.",
+            "description": "Server port",
             "env_variable": "SERVER_PORT",
             "default_value": "11000",
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|integer|between:1024,65535",
-            "field_type": "text"
-        },
-        {
-            "name": "Server Name",
-            "description": "The name of your Nitrox server.",
-            "env_variable": "SERVER_NAME",
-            "default_value": "Nitrox Server",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|max:64",
-            "field_type": "text"
-        },
-        {
-            "name": "Server Password",
-            "description": "Password for the server (leave empty for no password).",
-            "env_variable": "SERVER_PASSWORD",
-            "default_value": "",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "nullable|string|max:64",
-            "field_type": "text"
-        },
-        {
-            "name": "Max Players",
-            "description": "Maximum number of players allowed on the server.",
-            "env_variable": "MAX_PLAYERS",
-            "default_value": "10",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|integer|between:1,100",
-            "field_type": "text"
-        },
-        {
-            "name": "Save Name",
-            "description": "Name of the save file to use.",
-            "env_variable": "SAVE_NAME",
-            "default_value": "world",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|max:64",
             "field_type": "text"
         }
     ]
