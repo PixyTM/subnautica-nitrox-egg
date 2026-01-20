@@ -1,39 +1,111 @@
 {
+    "_comment": "Nitrox Standalone Server - No Steam Required",
     "meta": {
         "version": "PTDL_v2",
         "update_url": null
     },
-    "name": "Nitrox Subnautica",
-    "author": "admin@example.com",
-    "description": "Nitrox multiplayer mod server for Subnautica",
+    "exported_at": "2026-01-19T00:00:00+00:00",
+    "name": "Nitrox Subnautica Standalone",
+    "author": "custom@pelican.panel",
+    "description": "Nitrox standalone server for Subnautica multiplayer. Uses the new Linux builds that don't require Steam credentials or SteamCMD.",
     "features": null,
     "docker_images": {
         "ghcr.io/parkervcp/yolks:dotnet_9": "ghcr.io/parkervcp/yolks:dotnet_9"
     },
     "file_denylist": [],
-    "startup": "dotnet Nitrox.Server.Subnautica.dll",
+    "startup": "dotnet ./Nitrox.Server.Subnautica.dll",
     "config": {
-        "files": "{}",
-        "startup": "{\n    \"done\": \"listening\"\n}",
+        "files": "{\r\n    \"server.cfg\": {\r\n        \"parser\": \"properties\",\r\n        \"find\": {\r\n            \"ServerPort\": \"{{server.build.default.port}}\",\r\n            \"SaveInterval\": \"{{server.build.env.SAVE_INTERVAL}}\",\r\n            \"DisableAutoSave\": \"{{server.build.env.SAVE_DISABLE}}\",\r\n            \"SaveName\": \"{{server.build.env.SAVE_NAME}}\",\r\n            \"ServerPassword\": \"{{server.build.env.SUBNAUTICA_PASSWORD}}\",\r\n            \"AdminPassword\": \"{{server.build.env.SUBNAUTICA_ADMIN_PASSWORD}}\",\r\n            \"GameMode\": \"{{server.build.env.SERVER_MODE}}\",\r\n            \"MaxConnections\": \"{{server.build.env.MAX_PLAYERS}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \"Server is listening\"\r\n}",
         "logs": "{}",
-        "stop": "stop"
+        "stop": "^C"
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\ncd /mnt/server\napt update\napt install -y curl unzip jq\nARCH=$(uname -m)\nif [ \"$ARCH\" = \"x86_64\" ]; then\n    ARCH=\"x64\"\nelif [ \"$ARCH\" = \"aarch64\" ]; then\n    ARCH=\"arm64\"\nfi\nURL=$(curl -s https://api.github.com/repos/SubnauticaNitrox/Nitrox/releases/latest | jq -r \".assets[] | select(.name | contains(\\\"linux_${ARCH}\\\")) | .browser_download_url\")\necho \"Downloading from: $URL\"\ncurl -L -o nitrox.zip \"$URL\"\nunzip -o nitrox.zip\nrm nitrox.zip\nchmod +x Nitrox.Server.Subnautica 2>/dev/null || true\nchmod +x Nitrox.Launcher 2>/dev/null || true\necho \"Installation complete\"",
+            "script": "#!/bin/bash\r\nset -euo pipefail\r\n\r\ncd /mnt/server\r\n\r\n# Install dependencies\r\napt update\r\napt install -y curl unzip jq\r\n\r\n# Determine architecture\r\nARCH=$(uname -m)\r\nif [ \"$ARCH\" = \"x86_64\" ]; then\r\n    ARCH=\"x64\"\r\nelif [ \"$ARCH\" = \"aarch64\" ]; then\r\n    ARCH=\"arm64\"\r\nfi\r\n\r\necho \"Detected architecture: $ARCH\"\r\n\r\n# Get download URL for latest Nitrox Linux release\r\nif [ \"${NITROX_VERSION}\" = \"latest\" ]; then\r\n    echo \"Fetching latest Nitrox release...\"\r\n    DOWNLOAD_URL=$(curl -s https://api.github.com/repos/SubnauticaNitrox/Nitrox/releases/latest | jq -r \".assets[] | select(.name | contains(\\\"linux_${ARCH}\\\")) | .browser_download_url\")\r\nelse\r\n    echo \"Fetching Nitrox version ${NITROX_VERSION}...\"\r\n    DOWNLOAD_URL=$(curl -s https://api.github.com/repos/SubnauticaNitrox/Nitrox/releases | jq -r \".[] | select(.tag_name==\\\"${NITROX_VERSION}\\\") | .assets[] | select(.name | contains(\\\"linux_${ARCH}\\\")) | .browser_download_url\")\r\nfi\r\n\r\nif [ -z \"$DOWNLOAD_URL\" ]; then\r\n    echo \"ERROR: Could not find download URL for linux_${ARCH}\"\r\n    exit 1\r\nfi\r\n\r\necho \"Downloading from: $DOWNLOAD_URL\"\r\ncurl -L -o nitrox.zip \"$DOWNLOAD_URL\"\r\n\r\necho \"Extracting Nitrox...\"\r\nunzip -o nitrox.zip\r\nrm nitrox.zip\r\n\r\n# Set executable permissions\r\nchmod +x Nitrox.Server.Subnautica 2>/dev/null || true\r\nchmod +x Nitrox.Launcher 2>/dev/null || true\r\n\r\n# Create default config if it doesn't exist\r\nif [ ! -f server.cfg ]; then\r\n    echo \"Creating default server.cfg...\"\r\n    cat <<EOT > server.cfg\r\n# Server settings\r\nCreateFullEntityCache=False\r\nSeed=\r\nServerPort=11000\r\nSaveInterval=120000\r\nPostSaveCommandPath=\r\nMaxConnections=100\r\nInitialSyncTimeout=300000\r\nDisableConsole=False\r\nDisableAutoSave=False\r\nSaveName=world\r\nServerPassword=\r\nAdminPassword=PleaseChangeMe\r\nGameMode=SURVIVAL\r\nSerializerMode=JSON\r\nDefaultPlayerPerm=PLAYER\r\nDefaultOxygenValue=45\r\nDefaultMaxOxygenValue=45\r\nDefaultHealthValue=80\r\nDefaultHungerValue=50.5\r\nDefaultThirstValue=90.5\r\nDefaultInfectionValue=0.1\r\nAutoPortForward=False\r\nEOT\r\nfi\r\n\r\necho \"Installation complete!\"\r\necho \"Nitrox standalone server is ready.\"",
             "container": "ghcr.io/parkervcp/installers:debian",
             "entrypoint": "bash"
         }
     },
     "variables": [
         {
-            "name": "Server Port",
-            "description": "Server port",
-            "env_variable": "SERVER_PORT",
-            "default_value": "11000",
+            "name": "Nitrox Version",
+            "description": "Which version of Nitrox to install. Use 'latest' for the newest release or specify a version tag.",
+            "env_variable": "NITROX_VERSION",
+            "default_value": "latest",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|integer|between:1024,65535",
+            "rules": "required|string|between:3,20",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Save Interval",
+            "description": "Time between auto saves specified in milliseconds",
+            "env_variable": "SAVE_INTERVAL",
+            "default_value": "120000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|digits_between:6,7",
+            "field_type": "text"
+        },
+        {
+            "name": "Disable Auto Save",
+            "description": "Disables Auto Save: False / True",
+            "env_variable": "SAVE_DISABLE",
+            "default_value": "False",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:True,False",
+            "field_type": "text"
+        },
+        {
+            "name": "Save Name",
+            "description": "The save name for the server.",
+            "env_variable": "SAVE_NAME",
+            "default_value": "world",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "alpha_dash|between:1,100",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Password",
+            "description": "Password necessary for connecting to the server (leave empty for no password)",
+            "env_variable": "SUBNAUTICA_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|between:3,64",
+            "field_type": "text"
+        },
+        {
+            "name": "Admin Password",
+            "description": "Password to gain access to administrator commands on the server.",
+            "env_variable": "SUBNAUTICA_ADMIN_PASSWORD",
+            "default_value": "PleaseChangeMe",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|between:3,64",
+            "field_type": "text"
+        },
+        {
+            "name": "Game Mode",
+            "description": "Game Mode setting: SURVIVAL, FREEDOM, HARDCORE, CREATIVE",
+            "env_variable": "SERVER_MODE",
+            "default_value": "SURVIVAL",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:SURVIVAL,FREEDOM,HARDCORE,CREATIVE",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Players",
+            "description": "Maximum number of players allowed on the server",
+            "env_variable": "MAX_PLAYERS",
+            "default_value": "100",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:1,100",
             "field_type": "text"
         }
     ]
